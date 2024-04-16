@@ -3,30 +3,38 @@ import java.util.Objects;
 
 
 public class Message implements Serializable {
+
+
     static final long serialVersionUID = 42L;
-    private String data, username, receiver, flag;
+    private String playerName, OpponentName, data, flag;
     private Element element;
 
 
-
-    public Message(String playerName, String OpponentName , Element element, String flag) {
-        this.username = origUsername;
+    /*
+    Three-Argument Default Constructor
+        ~ used for checking unique name
+     */
+    public Message(String playerName, String data, String flag) {
+        this.playerName = playerName;
         this.data = data;
-        this.receiver = destUsername;
         this.flag = flag;
     }
 
 
-    public String getData() {return data;}
-    public String getUsername() {return username;}
-    public String getReceiver() {return receiver;}
-    public boolean isCheckUniqueName() {return Objects.equals(flag, "isCheckUniqueName");}
-    public boolean isInfoName() {return (Objects.equals(flag, "isInfoName"));}
-    public boolean isPublicText() {return (Objects.equals(flag, "isPublicText"));}
-    public boolean isPrivateText() {return (Objects.equals(flag, "isPrivateText"));};
-    public boolean isUpdateFriends() {return (Objects.equals(flag, "isUpdateFriends"));}
-    public Element getElement(){return element;}
+    /*
+    Public Message Helper Functions
+     */
+    public String getPlayerName() {return playerName;}
+    public boolean flagIsCheckUniqueName() {return Objects.equals(flag, "flagIsCheckUniqueName");}
+    public boolean usernameIsUnique() {return Objects.equals(data, "true");}
+    public boolean flagIsNewClientJoined() {return Objects.equals(flag, "flagIsNewClientJoined");}
 
+
+
+
+    /*
+    Element Class
+     */
     public class Element {
         int x_coord, y_coord; // The position of the element
         int shipSize; // To determine the element's size
