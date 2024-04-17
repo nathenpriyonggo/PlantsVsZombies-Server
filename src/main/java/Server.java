@@ -79,18 +79,28 @@ public class Server {
 			while(true) {
 				try {
 
-					Message msg = (Message) in.readObject();
+					Object data = in.readObject();
 
-					// Input message requesting to check for unique name
-					if (msg.flagIsCheckUniqueName()) {
-						checkUniqueUsername(msg.getPlayerName());
-					}
-					// Input message requesting to add new user to 'usernames'
-					else if (msg.flagIsNewClientJoined()) {
-						clientName = msg.getPlayerName();
-						usernames.add(msg.getPlayerName());
-					}
+					// Type 'Message' input
+					if (data.getClass().toString().equals("class Message")) {
 
+						Message msg = (Message) data;
+						// Input message requesting to check for unique name
+						if (msg.flagIsCheckUniqueName()) {
+							checkUniqueUsername(msg.getPlayerName());
+						}
+						// Input message requesting to add new user to 'usernames'
+						else if (msg.flagIsNewClientJoined()) {
+							clientName = msg.getPlayerName();
+							usernames.add(msg.getPlayerName());
+						}
+					}
+					// Type 'Element' input
+					else if (data.getClass().toString().equals("class Element")) {
+
+						Element elem = (Element) data;
+						// FIXME
+					}
 
 				}
 				// Client got disconnected
