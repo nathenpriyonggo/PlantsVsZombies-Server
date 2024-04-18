@@ -27,6 +27,7 @@ public class Grid {
     }
 
     public void printGrid() {
+        ArrayList<Element>[] z = new ArrayList[0];
         for (ArrayList<Element> row : z) {
             for (Element element : row) {
                 System.out.print(element.getElementState() + " ");
