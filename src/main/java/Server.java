@@ -20,6 +20,7 @@ public class Server {
 	ArrayList<String> usernames = new ArrayList<>();
 	TheServer server;
 	private Consumer<Serializable> callback;
+	ArrayList<GameLogic> games;
 
 	// Default Constructor
 	Server(Consumer<Serializable> call){
@@ -58,6 +59,7 @@ public class Server {
 		ObjectInputStream in;
 		ObjectOutputStream out;
 		String clientName;
+		ArrayList<Element> array_clientElements;
 
 		// Default Constructor
 		ClientThread(Socket s){this.connection = s;}
@@ -100,6 +102,8 @@ public class Server {
 
 						Element elem = (Element) data;
 						// FIXME
+						//handling the flags
+						games.get(i).playerMove();
 					}
 
 				}
@@ -111,6 +115,7 @@ public class Server {
 					callback.accept(callBackMsg);
 					// Update array of client threads, 'clients' and users 'usernames'
 					usernames.remove(clientName);
+					//quick opponent and send to home screen -> let opponent know with flag
 					clients.remove(this);
 					break;
 				}
