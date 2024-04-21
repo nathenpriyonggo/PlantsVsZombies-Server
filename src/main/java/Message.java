@@ -8,7 +8,6 @@ public class Message implements Serializable {
     static final long serialVersionUID = 42L;
     private String playerName, OpponentName, data, flag;
 
-
     /*
     Three-Argument Default Constructor
         ~ used for checking unique name

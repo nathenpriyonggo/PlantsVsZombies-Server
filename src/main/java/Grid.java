@@ -21,7 +21,9 @@ public class Grid {
             for (int j = 0; j < 7; j++) {
                 int idx = i * 7 + j;
                 Element element = message.get(idx);
-                row.add(new Element(element.getPlayer(), element.getOpponent(), element.getX(), element.getY(), element.getShipSize(), element.getElementState(), element.getFlag()));
+                row.add(new Element(element.getPlayer(), element.getOpponent(), element.getX(),
+                        element.getY(), element.getShipSize(), element.getElementState(),
+                        element.getUrl(), element.getFlag()));
             }
             grid.add(row);
         }
@@ -32,7 +34,7 @@ public class Grid {
         for (int i = 0; i < 7; i++) {
             ArrayList<Element> row = new ArrayList<>();
             for (int j = 0; j < 7; j++) {
-                row.add(new Element("player", "opp", i, j, 0, 0, ""));
+//                row.add(new Element("player", "opp", i, j, 0, 0, ""));
             }
             grid.add(row);
         }

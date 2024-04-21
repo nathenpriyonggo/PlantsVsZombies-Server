@@ -103,7 +103,6 @@ public class Server {
 						Element elem = (Element) data;
 						// FIXME
 						//handling the flags
-						games.get(i).playerMove();
 					}
 
 				}
