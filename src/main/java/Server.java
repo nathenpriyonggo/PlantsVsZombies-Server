@@ -18,9 +18,11 @@ public class Server {
 
 	ArrayList<ClientThread> clients = new ArrayList<ClientThread>();
 	ArrayList<String> usernames = new ArrayList<>();
+	ArrayList<Game> games = new ArrayList<>();
 	TheServer server;
 	private Consumer<Serializable> callback;
-	ArrayList<GameLogic> games;
+	String str_playerWhoIsWaiting = "";
+	Ships ships_playerWhoIsWaiting;
 
 	// Default Constructor
 	Server(Consumer<Serializable> call){
@@ -60,6 +62,8 @@ public class Server {
 		ObjectOutputStream out;
 		String clientName;
 		ArrayList<Element> array_clientElements;
+		Game clientGame;
+
 
 		// Default Constructor
 		ClientThread(Socket s){this.connection = s;}
@@ -82,7 +86,7 @@ public class Server {
 				try {
 
 					Object data = in.readObject();
-
+					System.out.println(data.getClass());
 					// Type 'Message' input
 					if (data.getClass().toString().equals("class Message")) {
 
@@ -101,8 +105,45 @@ public class Server {
 					else if (data.getClass().toString().equals("class Element")) {
 
 						Element elem = (Element) data;
-						// FIXME
-						//handling the flags
+						clientGame.playerMove(clientName, elem);
+					}
+					// Type 'Ships' input
+					else if (data.getClass().toString().equals("class Ships")) {
+
+						Ships ships = (Ships) data;
+						// New player passing in their new ships grid
+						if (!ships.inGame) {
+							// New player requesting PvP
+							if (Objects.equals(ships.opponentName, "Player")) {
+								// No player is in queue
+								if (Objects.equals(str_playerWhoIsWaiting, "")) {
+									System.out.println("in yesssss");
+									str_playerWhoIsWaiting = clientName;
+									ships_playerWhoIsWaiting = ships;
+								}
+								// Player is in queue, start game
+								else {
+									clientGame = new Game(ships, ships_playerWhoIsWaiting);
+									for (int i = 0; i < clients.size(); i++) {
+										if (Objects.equals(clients.get(i).clientName, str_playerWhoIsWaiting)) {
+											clients.get(i).clientGame = clientGame;
+											clientGame.setGameThreads(this, clients.get(i));
+										}
+									}
+									games.add(clientGame);
+
+									clientGame.sendClientsInitialGrid();
+
+									str_playerWhoIsWaiting = "";
+									ships_playerWhoIsWaiting = null;
+								}
+							}
+							// New Player requesting battle with AI
+							else if (Objects.equals(ships.opponentName, "AI")) {
+
+								// FIXME -->
+							}
+						}
 					}
 
 				}
@@ -112,6 +153,14 @@ public class Server {
 					String callBackMsg = "-- " + clientName + " has left the server! --";
 					// Send "left the server" notification to GUI
 					callback.accept(callBackMsg);
+					// Remove current game
+					for (int i = 0; i < games.size(); i++) {
+						if (Objects.equals(games.get(i).str_player1, clientName)
+								|| Objects.equals(games.get(i).str_player2, clientName)) {
+							games.get(i).unexpectedExit(clientName);
+						}
+					}
+					games.remove(clientGame);
 					// Update array of client threads, 'clients' and users 'usernames'
 					usernames.remove(clientName);
 					//quick opponent and send to home screen -> let opponent know with flag
@@ -122,14 +171,12 @@ public class Server {
 		}
 
 
-
-
 		// ----------------------------- Helper Functions Below -----------------------------
 
 		/*
 		Send 'Message' to current client thread
 		 */
-		public void send(Message msg) {
+		public void send(Object msg) {
 
 			try {out.writeObject(msg);}
 			catch (IOException e){e.printStackTrace();};
@@ -153,10 +200,83 @@ public class Server {
 
 
 	}
+
+
+	/*
+	Game Class which contains two players which are currently in a game
+	 */
+	public class Game {
+		Ships ships_player1, ships_player2;
+		String str_player1, str_player2;
+		ClientThread thread_player1, thread_player2;
+
+		// Default constructor
+		public Game(Ships ships_player1, Ships ships_player2) {
+			this.ships_player1 = ships_player1;
+			this.ships_player2 = ships_player2;
+			this.str_player1 = ships_player1.playerName;
+			this.str_player2 = ships_player2.playerName;
+
+			ships_player1.opponentName = str_player2;
+			ships_player2.opponentName = str_player1;
+			ships_player1.inGame = true;
+			ships_player2.inGame = true;
+		}
+
+		public void setGameThreads(Server.ClientThread t1, Server.ClientThread t2) {
+			thread_player1 = t1;
+			thread_player2 = t2;
+		}
+
+
+		/*
+		   Helper Functions
+		 */
+
+		// Send both clients the initial ships
+		public void sendClientsInitialGrid() {
+			thread_player1.send(ships_player1);
+			thread_player1.send(ships_player2);
+			thread_player2.send(ships_player1);
+			thread_player2.send(ships_player2);
+			thread_player1.send(new Message(str_player1, "", "flagIsStartGameYourTurn"));
+			thread_player2.send(new Message(str_player2, "", "flagIsStartGameOppTurn"));
+		}
+
+		// A player exit unexpectedly, fix
+		public void unexpectedExit(String player) {
+			if (Objects.equals(player, str_player1)) {
+				thread_player2.send(new Message(str_player2, "true", "flagIsClientWon"));
+			}
+			else if (player == str_player2) {
+				thread_player1.send(new Message(str_player1, "true", "flagIsClientWon"));
+			}
+		}
+
+		// Player's move
+		public void playerMove(String player, Element elem) {
+			if (Objects.equals(player, str_player1)) {
+				Element retElem = ships_player2.didItHitPlant(elem.getX(), elem.getY());
+				// If all of player 2's ships are all hit, send win to player 1 and lose to player 2
+				if (ships_player2.isPeaSunk() && ships_player2.isSunSunk() && ships_player2.isWallSunk()
+					&& ships_player2.isSnowSunk() && ships_player2.isChompSunk()) {
+					thread_player1.send(new Message(str_player1, "true", "flagIsClientWon"));
+					thread_player2.send(new Message(str_player2, "true", "flagIsClientLost"));
+					return;
+				}
+				thread_player2.send(retElem);
+			}
+			else if (Objects.equals(player, str_player2)) {
+				Element retElem = ships_player1.didItHitPlant(elem.getX(), elem.getY());
+				// If all of player 1's ships are all hit, send win to player 2 and lose to player 1
+				if (ships_player1.isPeaSunk() && ships_player1.isSunSunk() && ships_player1.isWallSunk()
+						&& ships_player1.isSnowSunk() && ships_player1.isChompSunk()) {
+					thread_player1.send(new Message(str_player1, "true", "flagIsClientLost"));
+					thread_player2.send(new Message(str_player2, "true", "flagIsClientWon"));
+					return;
+				}
+				thread_player1.send(retElem);
+			}
+		}
+	}
 }
-
-
-	
-	
-
-	
