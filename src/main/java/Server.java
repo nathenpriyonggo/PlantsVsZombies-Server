@@ -21,7 +21,7 @@ public class Server {
 	ArrayList<Game> games = new ArrayList<>();
 	TheServer server;
 	private Consumer<Serializable> callback;
-	String str_playerWhoIsWaiting = "";
+	String str_playerWhoIsWaiting = "-";
 	Ships ships_playerWhoIsWaiting;
 
 	// Default Constructor
@@ -116,7 +116,7 @@ public class Server {
 							// New player requesting PvP
 							if (Objects.equals(ships.opponentName, "Player")) {
 								// No player is in queue
-								if (Objects.equals(str_playerWhoIsWaiting, "")) {
+								if (Objects.equals(str_playerWhoIsWaiting, "-")) {
 									System.out.println("in yesssss");
 									str_playerWhoIsWaiting = clientName;
 									ships_playerWhoIsWaiting = ships;
@@ -133,9 +133,10 @@ public class Server {
 									games.add(clientGame);
 
 									clientGame.sendClientsInitialGrid();
-
-									str_playerWhoIsWaiting = "";
+									System.out.println(str_playerWhoIsWaiting);
+									str_playerWhoIsWaiting = "-";
 									ships_playerWhoIsWaiting = null;
+									System.out.println(str_playerWhoIsWaiting);
 								}
 							}
 							// New Player requesting battle with AI
@@ -251,6 +252,8 @@ public class Server {
 			else if (player == str_player2) {
 				thread_player1.send(new Message(str_player1, "true", "flagIsClientWon"));
 			}
+			ships_player1.inGame = false;
+			ships_player2.inGame = false;
 		}
 
 		// Player's move
@@ -262,6 +265,9 @@ public class Server {
 					&& ships_player2.isSnowSunk() && ships_player2.isChompSunk()) {
 					thread_player1.send(new Message(str_player1, "true", "flagIsClientWon"));
 					thread_player2.send(new Message(str_player2, "true", "flagIsClientLost"));
+					ships_player1.inGame = false;
+					ships_player2.inGame = false;
+					games.remove(this);
 					return;
 				}
 				thread_player2.send(retElem);
@@ -273,6 +279,9 @@ public class Server {
 						&& ships_player1.isSnowSunk() && ships_player1.isChompSunk()) {
 					thread_player1.send(new Message(str_player1, "true", "flagIsClientLost"));
 					thread_player2.send(new Message(str_player2, "true", "flagIsClientWon"));
+					ships_player1.inGame = false;
+					ships_player2.inGame = false;
+					games.remove(this);
 					return;
 				}
 				thread_player1.send(retElem);
