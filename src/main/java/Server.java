@@ -6,6 +6,7 @@ import java.io.Serializable;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -23,6 +24,9 @@ public class Server {
 	private Consumer<Serializable> callback;
 	String str_playerWhoIsWaiting = "-";
 	Ships ships_playerWhoIsWaiting;
+	HashMap<String, Integer> hashMap_sunDatabase = new HashMap<>();
+	ArrayList<String> rankings = new ArrayList<>();
+
 
 	// Default Constructor
 	Server(Consumer<Serializable> call){
@@ -61,6 +65,7 @@ public class Server {
 		ObjectInputStream in;
 		ObjectOutputStream out;
 		String clientName;
+		int sun_points;
 		ArrayList<Element> array_clientElements;
 		Game clientGame;
 
@@ -86,7 +91,6 @@ public class Server {
 				try {
 
 					Object data = in.readObject();
-					System.out.println(data.getClass());
 					// Type 'Message' input
 					if (data.getClass().toString().equals("class Message")) {
 
@@ -98,7 +102,22 @@ public class Server {
 						// Input message requesting to add new user to 'usernames'
 						else if (msg.flagIsNewClientJoined()) {
 							clientName = msg.getPlayerName();
+							sun_points = 0;
 							usernames.add(msg.getPlayerName());
+							// Update 'rankings' and sun database
+							hashMap_sunDatabase.put(clientName, sun_points);
+							placeNameInRanking(clientName);
+							// Update clients with updated rankings
+							updateAllClientsRankings();
+						}
+						// Input message is sending points information
+						else if (msg.flagIsSendPoints()) {
+							// Update 'rankings' and sun database
+							sun_points = msg.getSunPoints();
+							hashMap_sunDatabase.put(clientName, sun_points);
+							placeNameInRanking(clientName);
+							// Update clients with updated rankings
+							updateAllClientsRankings();
 						}
 					}
 					// Type 'Element' input
@@ -117,7 +136,6 @@ public class Server {
 							if (Objects.equals(ships.opponentName, "Player")) {
 								// No player is in queue
 								if (Objects.equals(str_playerWhoIsWaiting, "-")) {
-									System.out.println("in yesssss");
 									str_playerWhoIsWaiting = clientName;
 									ships_playerWhoIsWaiting = ships;
 								}
@@ -125,7 +143,8 @@ public class Server {
 								else {
 									clientGame = new Game(ships, ships_playerWhoIsWaiting);
 									for (int i = 0; i < clients.size(); i++) {
-										if (Objects.equals(clients.get(i).clientName, str_playerWhoIsWaiting)) {
+										if (Objects.equals(clients.get(i).clientName,
+												str_playerWhoIsWaiting)) {
 											clients.get(i).clientGame = clientGame;
 											clientGame.setGameThreads(this, clients.get(i));
 										}
@@ -133,16 +152,18 @@ public class Server {
 									games.add(clientGame);
 
 									clientGame.sendClientsInitialGrid();
-									System.out.println(str_playerWhoIsWaiting);
 									str_playerWhoIsWaiting = "-";
 									ships_playerWhoIsWaiting = null;
-									System.out.println(str_playerWhoIsWaiting);
 								}
 							}
 							// New Player requesting battle with AI
 							else if (Objects.equals(ships.opponentName, "AI")) {
 
 								// FIXME -->
+								clientGame = new Game(ships, this);
+								clientGame.setGameThreads(this, null);
+								games.add(clientGame);
+
 							}
 						}
 					}
@@ -154,6 +175,7 @@ public class Server {
 					String callBackMsg = "-- " + clientName + " has left the server! --";
 					// Send "left the server" notification to GUI
 					callback.accept(callBackMsg);
+
 					// Remove current game
 					for (int i = 0; i < games.size(); i++) {
 						if (Objects.equals(games.get(i).str_player1, clientName)
@@ -162,10 +184,17 @@ public class Server {
 						}
 					}
 					games.remove(clientGame);
-					// Update array of client threads, 'clients' and users 'usernames'
+
+					// Update array of client threads 'clients' and users 'usernames'
 					usernames.remove(clientName);
-					//quick opponent and send to home screen -> let opponent know with flag
 					clients.remove(this);
+
+					// Remove from database of sun and 'rankings'
+					hashMap_sunDatabase.remove(clientName);
+					rankings.remove(clientName);
+					// Update clients with updated rankings
+					updateAllClientsRankings();
+
 					break;
 				}
 			}
@@ -199,8 +228,55 @@ public class Server {
 			send(new Message(username, "true", "flagIsCheckUniqueName"));
 		}
 
+		/*
+		Put 'clientName' in correct order in ranking
+		 */
+		public void placeNameInRanking(String name) {
+			if (rankings.isEmpty() || !rankings.contains(name)) {
+				rankings.add(name);
+			}
+			else {
+				rankings.remove(name);
+				for (int i = 0;  i < rankings.size(); i++) {
+					if (hashMap_sunDatabase.get(name)
+							>= hashMap_sunDatabase.get(rankings.get(i))) {
+						rankings.add(i, name);
+						return;
+					}
+				}
+				rankings.add(name);
+			}
+		}
+
+		/*
+		Update all client to be up-to-date with the rankings
+		 */
+		public void updateAllClientsRankings() {
+			for (ClientThread client : clients) {
+				client.send(new Message("","clear", "flagIsUpdateRankings"));
+				for (int i = 0; i < rankings.size(); i++) {
+					client.send(new Message(rankings.get(i),
+							String.valueOf(hashMap_sunDatabase.get(rankings.get(i))),
+							"flagIsUpdateRankings"));
+
+				}
+			}
+
+			System.out.println("UPDTE BELOOW __________>>>>>>>");
+			for (int i = 0; i < rankings.size(); i++) {
+				System.out.println((i+1) + ". " + rankings.get(i) + ", "
+						+ hashMap_sunDatabase.get(rankings.get(i)));
+			}
+		}
 
 	}
+
+
+
+
+
+
+
 
 
 	/*
@@ -210,8 +286,9 @@ public class Server {
 		Ships ships_player1, ships_player2;
 		String str_player1, str_player2;
 		ClientThread thread_player1, thread_player2;
+//		AI gameAI;
 
-		// Default constructor
+		// Default constructor, for PvP
 		public Game(Ships ships_player1, Ships ships_player2) {
 			this.ships_player1 = ships_player1;
 			this.ships_player2 = ships_player2;
@@ -224,10 +301,24 @@ public class Server {
 			ships_player2.inGame = true;
 		}
 
+		// Helper default constructor for setting up threads
 		public void setGameThreads(Server.ClientThread t1, Server.ClientThread t2) {
 			thread_player1 = t1;
 			thread_player2 = t2;
 		}
+
+		// Default constructor, for AI
+		public Game(Ships ships_player1, Server.ClientThread t1) {
+			this.ships_player1 = ships_player1;
+//			this.ships_player2 = gameAI.ships();
+			thread_player1 = t1;
+			ships_player1.opponentName = "ROBO-ZOMBZ";
+			ships_player2.opponentName = str_player1;
+			ships_player1.inGame = true;
+		}
+
+
+
 
 
 		/*
@@ -286,6 +377,11 @@ public class Server {
 				}
 				thread_player1.send(retElem);
 			}
+		}
+
+		// Send client initial grid, if playing against AI
+		public void sendClientAIGrid() {
+			thread_player1.send(ships_player2);
 		}
 	}
 }
