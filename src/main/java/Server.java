@@ -5,9 +5,7 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.Consumer;
 
 import javafx.animation.PauseTransition;
@@ -68,7 +66,6 @@ public class Server {
 		ObjectOutputStream out;
 		String clientName;
 		int sun_points;
-		ArrayList<Element> array_clientElements;
 		Game clientGame;
 
 
@@ -249,26 +246,51 @@ public class Server {
 //			}
 //		}
 
+//		public void placeNameInRanking(String name) {
+//			ArrayList<String> updatedRankings = new ArrayList<>(rankings);
+//
+//			if (!updatedRankings.contains(name)) {
+//				// Add the player to the rankings list if they don't exist
+//				updatedRankings.add(name);
+//			} else {
+//				updatedRankings.remove(name);
+//				for (int i = 0; i < updatedRankings.size(); i++) {
+//					if (hashMap_sunDatabase.get(name) >= hashMap_sunDatabase.get(updatedRankings.get(i))) {
+//						updatedRankings.add(i, name);
+//						// Update rankings with the new list
+//						rankings = updatedRankings;
+//						return;
+//					}
+//				}
+//				updatedRankings.add(name);
+//			}
+//			rankings = updatedRankings;
+//		}
+
 		public void placeNameInRanking(String name) {
 			ArrayList<String> updatedRankings = new ArrayList<>(rankings);
 
 			if (!updatedRankings.contains(name)) {
-				// Add the player to the rankings list if they don't exist
-				updatedRankings.add(name);
+				updatedRankings.add(name); // Add the player to the rankings list if they don't exist
 			} else {
 				updatedRankings.remove(name);
 				for (int i = 0; i < updatedRankings.size(); i++) {
 					if (hashMap_sunDatabase.get(name) >= hashMap_sunDatabase.get(updatedRankings.get(i))) {
 						updatedRankings.add(i, name);
-						// Update rankings with the new list
-						rankings = updatedRankings;
+						rankings = updatedRankings; // Update rankings with the new list
 						return;
 					}
 				}
 				updatedRankings.add(name);
 			}
-			rankings = updatedRankings;
+
+			// Sort the rankings based on the player's score
+			Collections.sort(updatedRankings, Comparator.comparingInt(
+					player -> hashMap_sunDatabase.getOrDefault(player, 0)).reversed());
+
+			rankings = updatedRankings; // Update rankings with the new list
 		}
+
 
 		/*
 		Update all client to be up-to-date with the rankings
@@ -282,12 +304,6 @@ public class Server {
 							"flagIsUpdateRankings"));
 
 				}
-			}
-
-			System.out.println("UPDTE BELOOW __________>>>>>>>");
-			for (int i = 0; i < rankings.size(); i++) {
-				System.out.println((i+1) + ". " + rankings.get(i) + ", "
-						+ hashMap_sunDatabase.get(rankings.get(i)));
 			}
 		}
 
@@ -331,16 +347,11 @@ public class Server {
 			this.ships_player1 = ships_player1;
 			this.ships_player2 = gameAI.getAIships();
 
-			gameAI.AIships.printShipsState();
 			this.str_player1 = ships_player1.playerName;
 			this.str_player2 = "ROBO-ZOMBZ";
 			thread_player1 = t1;
 
 			array_AIMoves = gameAI.generateMoves(ships_player1);
-			// FIXME --> delete me
-			for (int i = 0; i < array_AIMoves.size(); i++) {
-				System.out.println(array_AIMoves.get(i).getX() + " " + array_AIMoves.get(i).getY());
-			}
 
 			ships_player1.opponentName = str_player2;
 			ships_player2.opponentName = str_player1;
@@ -375,7 +386,10 @@ public class Server {
 
 		// A player exit unexpectedly, fix
 		public void unexpectedExit(String player) {
-			if (Objects.equals(player, str_player1)) {
+			if (Objects.equals(str_player2, "ROBO-ZOMBZ")) {
+				// nothing
+			}
+			else if (Objects.equals(player, str_player1)) {
 				thread_player2.send(new Message(str_player2, "true", "flagIsClientWon"));
 			}
 			else if (Objects.equals(player, str_player2)) {

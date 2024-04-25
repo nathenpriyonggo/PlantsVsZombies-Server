@@ -45,7 +45,6 @@ public class AI {
             while (!placed) {
                 int x = rand.nextInt(rowSize);
                 int y = rand.nextInt(colSize);
-                System.out.println(x + " " + y + " " + size + " " + orient);
                 if (placeShip(x, y, size, orient)) {
                     placed = true;
                 }
@@ -138,7 +137,6 @@ public class AI {
 
     public ArrayList<Element> generateMoves(Ships gameState) {
         this.opponentShips = new Ships(gameState);
-        System.out.println("Generating Moves");
         int gridWidth = 7;
         int centerX = 3;
         int centerY = 3;
