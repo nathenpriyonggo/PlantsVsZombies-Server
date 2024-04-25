@@ -10,8 +10,10 @@ import java.util.HashMap;
 import java.util.Objects;
 import java.util.function.Consumer;
 
+import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.scene.control.ListView;
+import javafx.util.Duration;
 
 
 public class Server {
@@ -161,9 +163,8 @@ public class Server {
 
 								// FIXME -->
 								clientGame = new Game(ships, this);
-								clientGame.setGameThreads(this, null);
 								games.add(clientGame);
-
+								clientGame.sendClientAIGrid();
 							}
 						}
 					}
@@ -231,21 +232,42 @@ public class Server {
 		/*
 		Put 'clientName' in correct order in ranking
 		 */
+//		public void placeNameInRanking(String name) {
+//			if (rankings.isEmpty() || !rankings.contains(name)) {
+//				rankings.add(name);
+//			}
+//			else {
+//				rankings.remove(name);
+//				for (int i = 0;  i < rankings.size(); i++) {
+//					if (hashMap_sunDatabase.get(name)
+//							>= hashMap_sunDatabase.get(rankings.get(i))) {
+//						rankings.add(i, name);
+//						return;
+//					}
+//				}
+//				rankings.add(name);
+//			}
+//		}
+
 		public void placeNameInRanking(String name) {
-			if (rankings.isEmpty() || !rankings.contains(name)) {
-				rankings.add(name);
-			}
-			else {
-				rankings.remove(name);
-				for (int i = 0;  i < rankings.size(); i++) {
-					if (hashMap_sunDatabase.get(name)
-							>= hashMap_sunDatabase.get(rankings.get(i))) {
-						rankings.add(i, name);
+			ArrayList<String> updatedRankings = new ArrayList<>(rankings);
+
+			if (!updatedRankings.contains(name)) {
+				// Add the player to the rankings list if they don't exist
+				updatedRankings.add(name);
+			} else {
+				updatedRankings.remove(name);
+				for (int i = 0; i < updatedRankings.size(); i++) {
+					if (hashMap_sunDatabase.get(name) >= hashMap_sunDatabase.get(updatedRankings.get(i))) {
+						updatedRankings.add(i, name);
+						// Update rankings with the new list
+						rankings = updatedRankings;
 						return;
 					}
 				}
-				rankings.add(name);
+				updatedRankings.add(name);
 			}
+			rankings = updatedRankings;
 		}
 
 		/*
@@ -273,12 +295,6 @@ public class Server {
 
 
 
-
-
-
-
-
-
 	/*
 	Game Class which contains two players which are currently in a game
 	 */
@@ -286,7 +302,9 @@ public class Server {
 		Ships ships_player1, ships_player2;
 		String str_player1, str_player2;
 		ClientThread thread_player1, thread_player2;
-//		AI gameAI;
+		AI gameAI;
+		ArrayList<Element> array_AIMoves = new ArrayList<>();
+		int AIiter;
 
 		// Default constructor, for PvP
 		public Game(Ships ships_player1, Ships ships_player2) {
@@ -309,12 +327,25 @@ public class Server {
 
 		// Default constructor, for AI
 		public Game(Ships ships_player1, Server.ClientThread t1) {
+			gameAI = new AI();
 			this.ships_player1 = ships_player1;
-//			this.ships_player2 = gameAI.ships();
+			this.ships_player2 = gameAI.getAIships();
+
+			gameAI.AIships.printShipsState();
+			this.str_player1 = ships_player1.playerName;
+			this.str_player2 = "ROBO-ZOMBZ";
 			thread_player1 = t1;
-			ships_player1.opponentName = "ROBO-ZOMBZ";
+
+			array_AIMoves = gameAI.generateMoves(ships_player1);
+			// FIXME --> delete me
+			for (int i = 0; i < array_AIMoves.size(); i++) {
+				System.out.println(array_AIMoves.get(i).getX() + " " + array_AIMoves.get(i).getY());
+			}
+
+			ships_player1.opponentName = str_player2;
 			ships_player2.opponentName = str_player1;
 			ships_player1.inGame = true;
+			AIiter = 0;
 		}
 
 
@@ -335,12 +366,19 @@ public class Server {
 			thread_player2.send(new Message(str_player2, "", "flagIsStartGameOppTurn"));
 		}
 
+		// Send client initial grid, if playing against AI
+		public void sendClientAIGrid() {
+			thread_player1.send(ships_player1);
+			thread_player1.send(ships_player2);
+			thread_player1.send(new Message(str_player1, "", "flagIsStartGameYourTurn"));
+		}
+
 		// A player exit unexpectedly, fix
 		public void unexpectedExit(String player) {
 			if (Objects.equals(player, str_player1)) {
 				thread_player2.send(new Message(str_player2, "true", "flagIsClientWon"));
 			}
-			else if (player == str_player2) {
+			else if (Objects.equals(player, str_player2)) {
 				thread_player1.send(new Message(str_player1, "true", "flagIsClientWon"));
 			}
 			ships_player1.inGame = false;
@@ -349,39 +387,66 @@ public class Server {
 
 		// Player's move
 		public void playerMove(String player, Element elem) {
-			if (Objects.equals(player, str_player1)) {
-				Element retElem = ships_player2.didItHitPlant(elem.getX(), elem.getY());
-				// If all of player 2's ships are all hit, send win to player 1 and lose to player 2
-				if (ships_player2.isPeaSunk() && ships_player2.isSunSunk() && ships_player2.isWallSunk()
-					&& ships_player2.isSnowSunk() && ships_player2.isChompSunk()) {
-					thread_player1.send(new Message(str_player1, "true", "flagIsClientWon"));
-					thread_player2.send(new Message(str_player2, "true", "flagIsClientLost"));
-					ships_player1.inGame = false;
-					ships_player2.inGame = false;
-					games.remove(this);
-					return;
-				}
-				thread_player2.send(retElem);
-			}
-			else if (Objects.equals(player, str_player2)) {
-				Element retElem = ships_player1.didItHitPlant(elem.getX(), elem.getY());
-				// If all of player 1's ships are all hit, send win to player 2 and lose to player 1
-				if (ships_player1.isPeaSunk() && ships_player1.isSunSunk() && ships_player1.isWallSunk()
-						&& ships_player1.isSnowSunk() && ships_player1.isChompSunk()) {
-					thread_player1.send(new Message(str_player1, "true", "flagIsClientLost"));
-					thread_player2.send(new Message(str_player2, "true", "flagIsClientWon"));
-					ships_player1.inGame = false;
-					ships_player2.inGame = false;
-					games.remove(this);
-					return;
-				}
-				thread_player1.send(retElem);
-			}
-		}
 
-		// Send client initial grid, if playing against AI
-		public void sendClientAIGrid() {
-			thread_player1.send(ships_player2);
+			// AI moves
+			if (Objects.equals(str_player2, "ROBO-ZOMBZ")) {
+
+				Element playerElem = ships_player2.didItHitPlant(elem.getX(), elem.getY());
+				// Check if player wins
+				if (ships_player2.isAllSunk()) {
+					thread_player1.send(new Message(str_player1, "true", "flagIsClientWon"));
+					ships_player1.inGame = false;
+					games.remove(this);
+					return;
+				}
+
+				Element AIMoveCoorElem = array_AIMoves.get(AIiter);
+				Element AIElem = ships_player1.didItHitPlant(AIMoveCoorElem.getX(), AIMoveCoorElem.getY());
+				// Check if AI wins
+				if (ships_player1.isAllSunk()) {
+					thread_player1.send(new Message(str_player1, "true", "flagIsClientLost"));
+					ships_player1.inGame = false;
+					games.remove(this);
+					return;
+				}
+				AIiter++;
+
+				PauseTransition delay = new PauseTransition(Duration.seconds(1));
+				delay.setOnFinished(e-> {
+					thread_player1.send(AIElem);
+				});
+				delay.play();
+			}
+			// Player vs Player moves
+			else {
+				if (Objects.equals(player, str_player1)) {
+					Element retElem = ships_player2.didItHitPlant(elem.getX(), elem.getY());
+					// If all of player 2's ships are all hit, send win to player 1 and lose to player 2
+					if (ships_player2.isPeaSunk() && ships_player2.isSunSunk() && ships_player2.isWallSunk()
+							&& ships_player2.isSnowSunk() && ships_player2.isChompSunk()) {
+						thread_player1.send(new Message(str_player1, "true", "flagIsClientWon"));
+						thread_player2.send(new Message(str_player2, "true", "flagIsClientLost"));
+						ships_player1.inGame = false;
+						ships_player2.inGame = false;
+						games.remove(this);
+						return;
+					}
+					thread_player2.send(retElem);
+				} else if (Objects.equals(player, str_player2)) {
+					Element retElem = ships_player1.didItHitPlant(elem.getX(), elem.getY());
+					// If all of player 1's ships are all hit, send win to player 2 and lose to player 1
+					if (ships_player1.isPeaSunk() && ships_player1.isSunSunk() && ships_player1.isWallSunk()
+							&& ships_player1.isSnowSunk() && ships_player1.isChompSunk()) {
+						thread_player1.send(new Message(str_player1, "true", "flagIsClientLost"));
+						thread_player2.send(new Message(str_player2, "true", "flagIsClientWon"));
+						ships_player1.inGame = false;
+						ships_player2.inGame = false;
+						games.remove(this);
+						return;
+					}
+					thread_player1.send(retElem);
+				}
+			}
 		}
 	}
 }
